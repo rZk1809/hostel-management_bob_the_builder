@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import s from '../styles/dashboard.module.css';
 
 export default function Pagination({ pagination, onPageChange }) {
@@ -6,27 +7,33 @@ export default function Pagination({ pagination, onPageChange }) {
     const { page, pages, hasNextPage, hasPrevPage } = pagination;
 
     return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', marginTop: '1.5rem', padding: '1rem 0' }}>
+        <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '0.75rem', paddingTop: '1.25rem',
+        }}>
             <button
                 className={s.btnGhost}
                 disabled={!hasPrevPage}
                 onClick={() => onPageChange(page - 1)}
-                style={{ padding: '6px 14px', opacity: hasPrevPage ? 1 : 0.4, cursor: hasPrevPage ? 'pointer' : 'not-allowed' }}
+                style={{ opacity: hasPrevPage ? 1 : 0.35, cursor: hasPrevPage ? 'pointer' : 'not-allowed' }}
             >
-                ← Prev
+                <ChevronLeft size={14} /> Prev
             </button>
 
-            <span style={{ fontSize: '0.85rem', color: 'var(--muted)', fontWeight: 500 }}>
-                Page {page} of {pages}
+            <span style={{
+                fontSize: '0.8rem', color: 'var(--muted)',
+                fontFamily: 'DM Mono, monospace',
+            }}>
+                {page} / {pages}
             </span>
 
             <button
                 className={s.btnGhost}
                 disabled={!hasNextPage}
                 onClick={() => onPageChange(page + 1)}
-                style={{ padding: '6px 14px', opacity: hasNextPage ? 1 : 0.4, cursor: hasNextPage ? 'pointer' : 'not-allowed' }}
+                style={{ opacity: hasNextPage ? 1 : 0.35, cursor: hasNextPage ? 'pointer' : 'not-allowed' }}
             >
-                Next →
+                Next <ChevronRight size={14} />
             </button>
         </div>
     );

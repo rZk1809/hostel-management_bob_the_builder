@@ -1,34 +1,72 @@
 const Complaint = require('../models/Complaint');
 
-// ── Helper: format Mongoose doc _id → id ─────────────────────────────────────
-const fmt = (doc) => { const o = doc.toObject(); o.id = o._id; delete o._id; return o; };
+// ── Helper: format doc for JSON response ──────────────────────────────────────
+const fmt = (doc) => {
+    const o = doc.toObject();
+    o.id = o._id.toString();
+    delete o._id;
+    delete o.__v;
+    // Normalize the populated assignedTo sub-document
+    if (o.assignedTo && typeof o.assignedTo === 'object' && o.assignedTo._id) {
+        o.assignedTo = {
+            id:   o.assignedTo._id.toString(),
+            name: o.assignedTo.name,
+            role: o.assignedTo.role,
+        };
+    }
+    return o;
+};
 
-// @desc    Get complaints (students see own; warden/admin see all)
+// @desc    Get complaints (role-scoped, filterable, searchable, paginated)
 // @route   GET /api/complaints
 // @access  Private
 exports.getComplaints = async (req, res) => {
     try {
-        const { status, category, priority, page = 1, limit = 20 } = req.query;
+        const { status, category, priority, page = 1, limit = 20, search } = req.query;
 
         const query = {};
-        // Students only see their own complaints
-        if (req.user.role === 'student') query.user = req.user.id;
 
-        if (status && ['open', 'in-progress', 'resolved'].includes(status)) query.status = status;
+        // ── Role-based scoping ─────────────────────────────────────────────────
+        if (req.user.role === 'student')     query.user       = req.user.id;
+        if (req.user.role === 'maintenance') query.assignedTo = req.user.id; // Security: only see assigned
+
+        // ── Filters ───────────────────────────────────────────────────────────
+        if (status   && ['open', 'in-progress', 'resolved'].includes(status))                              query.status   = status;
         if (category && ['maintenance', 'food', 'wifi', 'cleanliness', 'security', 'other'].includes(category)) query.category = category;
-        if (priority && ['low', 'medium', 'high'].includes(priority)) query.priority = priority;
+        if (priority && ['low', 'medium', 'high'].includes(priority))                                     query.priority = priority;
 
-        const skip = (Number(page) - 1) * Number(limit);
-        const total = await Complaint.countDocuments(query);
+        // ── Text search (title, description, student name) ────────────────────
+        if (search && search.trim()) {
+            query.$or = [
+                { title:       { $regex: search.trim(), $options: 'i' } },
+                { description: { $regex: search.trim(), $options: 'i' } },
+                { studentName: { $regex: search.trim(), $options: 'i' } },
+            ];
+        }
+
+        const pageNum  = Number(page);
+        const limitNum = Number(limit);
+        const skip     = (pageNum - 1) * limitNum;
+        const total    = await Complaint.countDocuments(query);
+        const pages    = Math.ceil(total / limitNum) || 1;
+
         const complaints = await Complaint.find(query)
             .sort({ createdAt: -1 })
             .skip(skip)
-            .limit(Number(limit))
+            .limit(limitNum)
+            .populate('assignedTo', 'name role')
             .select('-__v');
 
         res.json({
             complaints: complaints.map(fmt),
-            pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }
+            pagination: {
+                page:        pageNum,
+                limit:       limitNum,
+                total,
+                pages,
+                hasNextPage: pageNum < pages,
+                hasPrevPage: pageNum > 1,
+            },
         });
     } catch (error) {
         console.error('[getComplaints]', error);
@@ -41,11 +79,18 @@ exports.getComplaints = async (req, res) => {
 // @access  Private
 exports.getComplaint = async (req, res) => {
     try {
-        const complaint = await Complaint.findById(req.params.id).select('-__v');
+        const complaint = await Complaint.findById(req.params.id)
+            .populate('assignedTo', 'name role')
+            .select('-__v');
+
         if (!complaint) return res.status(404).json({ error: 'Complaint not found.' });
 
-        // IDOR check: students can only view their own complaints
+        // IDOR: students can only view their own
         if (req.user.role === 'student' && complaint.user.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Access denied.' });
+        }
+        // Maintenance: can only view assigned complaints
+        if (req.user.role === 'maintenance' && complaint.assignedTo?.id !== req.user.id) {
             return res.status(403).json({ error: 'Access denied.' });
         }
 
@@ -62,7 +107,7 @@ exports.getComplaint = async (req, res) => {
 // @access  Private
 exports.createComplaint = async (req, res) => {
     try {
-        const { category, title, description, priority } = req.body;
+        const { category, title, description, priority, images } = req.body;
 
         const VALID_CATEGORIES = ['maintenance', 'food', 'wifi', 'cleanliness', 'security', 'other'];
         const VALID_PRIORITIES = ['low', 'medium', 'high'];
@@ -77,14 +122,15 @@ exports.createComplaint = async (req, res) => {
             return res.status(400).json({ error: 'Invalid priority value.' });
 
         const complaint = await Complaint.create({
-            user: req.user.id,
+            user:        req.user.id,
             studentName: req.user.name,
-            roomNumber: req.user.roomNumber || 'N/A',
+            roomNumber:  req.user.roomNumber || 'N/A',
             category,
-            title: title.trim(),
+            title:       title.trim(),
             description: description.trim(),
-            priority: priority || 'medium',
-            status: 'open',
+            priority:    priority || 'medium',
+            status:      'open',
+            images:      Array.isArray(images) ? images : [],
         });
 
         res.status(201).json(fmt(complaint));
@@ -94,7 +140,7 @@ exports.createComplaint = async (req, res) => {
     }
 };
 
-// @desc    Update a complaint (status/priority — with ownership and role checks)
+// @desc    Update a complaint
 // @route   PATCH /api/complaints/:id
 // @access  Private
 exports.updateComplaint = async (req, res) => {
@@ -102,24 +148,23 @@ exports.updateComplaint = async (req, res) => {
         const complaint = await Complaint.findById(req.params.id);
         if (!complaint) return res.status(404).json({ error: 'Complaint not found.' });
 
-        // ── IDOR fix: only owner or warden/admin can update ───────────────────
         const isOwner = complaint.user.toString() === req.user.id;
         const isStaff = ['admin', 'warden', 'maintenance'].includes(req.user.role);
+
         if (!isOwner && !isStaff) {
             return res.status(403).json({ error: 'Access denied.' });
         }
 
-        // Students can only edit title and description (not status/priority)
         const STUDENT_ALLOWED = ['title', 'description'];
-        const STAFF_ALLOWED = ['status', 'priority', 'title', 'description', 'assignedTo'];
-        const allowed = isStaff ? STAFF_ALLOWED : STUDENT_ALLOWED;
+        const STAFF_ALLOWED   = ['status', 'priority', 'title', 'description', 'assignedTo'];
+        const allowed         = isStaff ? STAFF_ALLOWED : STUDENT_ALLOWED;
 
-        const VALID_STATUSES = ['open', 'in-progress', 'resolved'];
+        const VALID_STATUSES   = ['open', 'in-progress', 'resolved'];
         const VALID_PRIORITIES = ['low', 'medium', 'high'];
 
         allowed.forEach(field => {
             if (req.body[field] !== undefined) {
-                if (field === 'status' && !VALID_STATUSES.includes(req.body[field])) return;
+                if (field === 'status'   && !VALID_STATUSES.includes(req.body[field]))   return;
                 if (field === 'priority' && !VALID_PRIORITIES.includes(req.body[field])) return;
                 complaint[field] = req.body[field];
             }
@@ -134,7 +179,7 @@ exports.updateComplaint = async (req, res) => {
     }
 };
 
-// @desc    Delete complaint (owner or admin/warden only)
+// @desc    Delete complaint
 // @route   DELETE /api/complaints/:id
 // @access  Private
 exports.deleteComplaint = async (req, res) => {
@@ -142,9 +187,9 @@ exports.deleteComplaint = async (req, res) => {
         const complaint = await Complaint.findById(req.params.id);
         if (!complaint) return res.status(404).json({ error: 'Complaint not found.' });
 
-        // ── IDOR fix: only owner or admin can delete ──────────────────────────
         const isOwner = complaint.user.toString() === req.user.id;
         const isAdmin = ['admin', 'warden'].includes(req.user.role);
+
         if (!isOwner && !isAdmin) {
             return res.status(403).json({ error: 'Access denied.' });
         }
@@ -158,29 +203,22 @@ exports.deleteComplaint = async (req, res) => {
     }
 };
 
-// @desc    Get stats (aggregate counts)
+// @desc    Get stats (scoped)
 // @route   GET /api/stats
 // @access  Private
 exports.getStats = async (req, res) => {
     try {
-        // Scope stats to the user's own complaints if they are a student
         const matchQuery = req.user.role === 'student' ? { user: req.user._id } : {};
 
         const [statusAgg, categoryAgg] = await Promise.all([
-            Complaint.aggregate([
-                { $match: matchQuery },
-                { $group: { _id: '$status', count: { $sum: 1 } } }
-            ]),
-            Complaint.aggregate([
-                { $match: matchQuery },
-                { $group: { _id: '$category', count: { $sum: 1 } } }
-            ])
+            Complaint.aggregate([{ $match: matchQuery }, { $group: { _id: '$status',   count: { $sum: 1 } } }]),
+            Complaint.aggregate([{ $match: matchQuery }, { $group: { _id: '$category', count: { $sum: 1 } } }]),
         ]);
 
-        const byStatus = { open: 0, 'in-progress': 0, resolved: 0 };
-        statusAgg.forEach(s => { byStatus[s._id] = s.count; });
-
+        const byStatus   = { open: 0, 'in-progress': 0, resolved: 0 };
         const byCategory = {};
+
+        statusAgg.forEach(s  => { byStatus[s._id]   = s.count; });
         categoryAgg.forEach(c => { byCategory[c._id] = c.count; });
 
         const total = Object.values(byStatus).reduce((a, b) => a + b, 0);

@@ -1,120 +1,278 @@
+/* ── Auth Shell ───────────────────────────────────────────────────────────── */
 .authShell {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background-color: var(--bg-color);
-  padding: 1rem;
+    display: flex;
+    min-height: 100vh;
+    background: var(--bg);
 }
 
+/* ── Left panel (branding) ────────────────────────────────────────────────── */
+.leftPanel {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 3rem;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    width: 40%;
+    flex-shrink: 0;
+}
+
+@media (min-width: 900px) {
+    .leftPanel { display: flex; }
+}
+
+.leftLogo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 3rem;
+}
+
+.leftLogoIcon {
+    width: 36px;
+    height: 36px;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--r);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+}
+
+.leftLogoName {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.02em;
+}
+
+.leftHeadline {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.03em;
+    line-height: 1.25;
+    margin-bottom: 1rem;
+}
+
+.leftSub {
+    font-size: 0.9rem;
+    color: var(--text-2);
+    line-height: 1.65;
+    max-width: 320px;
+}
+
+.featureList {
+    margin-top: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+.featureItem {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-size: 0.8375rem;
+    color: var(--text-2);
+}
+
+.featureDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+}
+
+/* ── Right panel (form) ───────────────────────────────────────────────────── */
+.rightPanel {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
 .authCard {
-  background: var(--card-bg);
-  padding: 2.5rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px var(--shadow-color);
-  width: 100%;
-  max-width: 400px;
-  border: 1px solid var(--border-color);
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 2rem;
-  justify-content: center;
+/* Mobile-only logo */
+.mobileLogo {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 2rem;
 }
 
-.logo h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--text-color);
+@media (min-width: 900px) {
+    .mobileLogo { display: none; }
 }
 
-.authCard h3 {
-  text-align: center;
-  margin-bottom: 1.5rem;
-  color: var(--text-color);
-  font-weight: 600;
+.mobileLogoIcon {
+    width: 30px;
+    height: 30px;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--r-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
 }
 
+.mobileLogoName {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.015em;
+}
+
+/* ── Form header ──────────────────────────────────────────────────────────── */
+.formHeader {
+    margin-bottom: 1.75rem;
+}
+
+.formTitle {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.025em;
+    margin-bottom: 0.375rem;
+}
+
+.formSubtitle {
+    font-size: 0.875rem;
+    color: var(--text-2);
+}
+
+/* ── Form ─────────────────────────────────────────────────────────────────── */
 .form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.125rem;
 }
 
 .formGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
 }
 
-.formGroup label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-color);
+.label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-2);
 }
 
-.formGroup input {
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-color);
-  color: var(--text-color);
-  font-size: 1rem;
+.input {
+    padding: 0.6875rem 0.875rem;
+    border-radius: var(--r);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 0.9rem;
+    width: 100%;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
 }
 
-.formGroup input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+.input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
+.input::placeholder { color: var(--muted); }
+
+/* Password field wrapper */
+.passwordWrap {
+    position: relative;
+}
+
+.passwordWrap .input {
+    padding-right: 2.75rem;
+}
+
+.eyeBtn {
+    position: absolute;
+    right: 0.6875rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: color 0.12s;
+}
+.eyeBtn:hover { color: var(--text-2); }
+
+/* ── Error ────────────────────────────────────────────────────────────────── */
+.error {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    background: var(--danger-dim);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: var(--danger);
+    padding: 0.7rem 0.875rem;
+    border-radius: var(--r);
+    font-size: 0.8375rem;
+    line-height: 1.45;
+}
+
+/* ── Submit button ────────────────────────────────────────────────────────── */
 .btnPrimary {
-  background: var(--primary-color);
-  color: white;
-  padding: 0.875rem;
-  border-radius: 8px;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  margin-top: 0.5rem;
-  transition: all 0.2s;
+    background: var(--accent);
+    color: #000;
+    padding: 0.7rem;
+    border-radius: var(--r);
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: none;
+    cursor: pointer;
+    margin-top: 0.25rem;
+    transition: opacity 0.15s, transform 0.1s;
+    width: 100%;
+    letter-spacing: -0.01em;
 }
 
 .btnPrimary:hover:not(:disabled) {
-  background: var(--primary-hover);
+    opacity: 0.88;
+    transform: translateY(-1px);
+}
+
+.btnPrimary:active:not(:disabled) {
+    transform: translateY(0);
 }
 
 .btnPrimary:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
-.error {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: var(--danger-color);
-  padding: 0.75rem;
-  border-radius: 6px;
-  margin-bottom: 1rem;
-  font-size: 0.875rem;
-  text-align: center;
-}
-
+/* ── Switch link ──────────────────────────────────────────────────────────── */
 .switchText {
-  text-align: center;
-  margin-top: 1.5rem;
-  font-size: 0.875rem;
-  color: var(--text-light);
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 0.8375rem;
+    color: var(--text-2);
 }
 
 .switchText a {
-  color: var(--primary-color);
-  text-decoration: none;
-  font-weight: 500;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
 }
 
-.switchText a:hover {
-  text-decoration: underline;
-}
+.switchText a:hover { text-decoration: underline; }

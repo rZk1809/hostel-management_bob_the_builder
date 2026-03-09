@@ -4,8 +4,9 @@
   "description": "Hostel Complaint Management System - Express API",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "echo \"Error: no test specified\" && exit 0"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

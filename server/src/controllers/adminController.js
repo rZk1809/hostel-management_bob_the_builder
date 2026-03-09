@@ -6,9 +6,15 @@ const Complaint = require('../models/Complaint');
 // @access  Private (Admin)
 exports.getAllUsers = async (req, res) => {
     try {
-        const { role, page = 1, limit = 50 } = req.query;
+        const { role, search, page = 1, limit = 50 } = req.query;
         const query = {};
         if (role) query.role = role;
+        if (search && search.trim()) {
+            query.$or = [
+                { name:  { $regex: search.trim(), $options: 'i' } },
+                { email: { $regex: search.trim(), $options: 'i' } },
+            ];
+        }
 
         const skip = (Number(page) - 1) * Number(limit);
         const total = await User.countDocuments(query);

@@ -1,125 +1,194 @@
 import { useState } from 'react';
+import { Trash2, User, Clock, Wrench, Utensils, Wifi, Sparkles, Shield, MoreHorizontal, CheckCircle2, UserCog } from 'lucide-react';
 import { api } from '../api';
-import { STATUS_COLORS, PRIORITY_COLORS, CATEGORY_ICONS, fmtDate } from '../utils';
+import { useAuth } from '../context/AuthContext';
+import { STATUS_COLORS, PRIORITY_COLORS, fmtDate } from '../utils';
 import ComplaintImages from './ComplaintImages';
 import Comments from './Comments';
 import styles from './ComplaintDetail.module.css';
 
-const STATUSES = ['open', 'in-progress', 'resolved'];
+const STATUSES   = ['open', 'in-progress', 'resolved'];
 const PRIORITIES = ['low', 'medium', 'high'];
+const STEP_LABELS = ['Open', 'In Progress', 'Resolved'];
+
+const CATEGORY_ICONS_COMP = {
+    maintenance: Wrench, food: Utensils, wifi: Wifi,
+    cleanliness: Sparkles, security: Shield, other: MoreHorizontal,
+};
+
+const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 
 export default function ComplaintDetail({ complaint: init, onUpdate, onDelete }) {
-  const [c, setC] = useState(init);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+    const { user } = useAuth();
+    const [c, setC] = useState(init);
+    const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
-  const patch = async (data) => {
-    setSaving(true);
-    const updated = await api.updateComplaint(c.id, data);
-    setC(updated);
-    onUpdate();
-    setSaving(false);
-  };
+    const isStaff = ['admin', 'warden', 'maintenance'].includes(user?.role);
+    const canDelete = user?.role === 'admin' || user?.role === 'warden' || c.user === user?.id;
 
-  const handleDelete = async () => {
-    if (!confirm('Delete this complaint?')) return;
-    setDeleting(true);
-    await api.deleteComplaint(c.id);
-    onDelete();
-  };
+    const patch = async (data) => {
+        setSaving(true);
+        try {
+            const updated = await api.updateComplaint(c.id, data);
+            setC(updated);
+            onUpdate?.();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setSaving(false);
+        }
+    };
 
-  return (
-    <div className={styles.wrap}>
-      <div className={styles.topRow}>
-        <div className={styles.roomBadge}>Room {c.roomNumber}</div>
-        <div className={styles.actions}>
-          <button className={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>
-            {deleting ? 'Deleting…' : '🗑 Delete'}
-          </button>
+    const handleDelete = async () => {
+        if (!confirm('Delete this complaint? This cannot be undone.')) return;
+        setDeleting(true);
+        try {
+            await api.deleteComplaint(c.id);
+            onDelete?.();
+        } catch (e) {
+            console.error(e);
+            setDeleting(false);
+        }
+    };
+
+    const CatIcon = CATEGORY_ICONS_COMP[c.category] || MoreHorizontal;
+    const statusColor = STATUS_COLORS[c.status];
+    const currentStep = STATUSES.indexOf(c.status);
+
+    return (
+        <div className={styles.wrap}>
+            {/* Top row */}
+            <div className={styles.topRow}>
+                <div className={styles.topLeft}>
+                    <span className={styles.roomBadge}>Room {c.roomNumber}</span>
+                    <span
+                        className={styles.statusBadge}
+                        style={{ background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}30` }}
+                    >
+                        {c.status}
+                    </span>
+                </div>
+                {canDelete && (
+                    <button className={styles.deleteBtn} onClick={handleDelete} disabled={deleting}>
+                        <Trash2 size={12} />
+                        {deleting ? 'Deleting…' : 'Delete'}
+                    </button>
+                )}
+            </div>
+
+            {/* Progress stepper */}
+            <div className={styles.stepper}>
+                {STATUSES.map((key, i) => {
+                    const done   = i < currentStep;
+                    const active = i === currentStep;
+                    return [
+                        <div key={key} className={styles.stepItem}>
+                            <div className={`${styles.stepDot} ${active ? styles.stepDotActive : ''} ${done ? styles.stepDotDone : ''}`}>
+                                {done ? <CheckCircle2 size={12} /> : i + 1}
+                            </div>
+                            <span className={`${styles.stepLabel} ${active ? styles.stepLabelActive : ''}`}>
+                                {STEP_LABELS[i]}
+                            </span>
+                        </div>,
+                        i < STATUSES.length - 1
+                            ? <div key={`line-${i}`} className={`${styles.stepConnector} ${done ? styles.stepConnectorDone : ''}`} />
+                            : null,
+                    ];
+                })}
+            </div>
+
+            {/* Title */}
+            <h2 className={styles.title}>{c.title}</h2>
+
+            {/* Meta */}
+            <div className={styles.metaRow}>
+                <span className={styles.metaItem}>
+                    <CatIcon size={13} />
+                    {cap(c.category)}
+                </span>
+                <span className={styles.metaItem}>
+                    <User size={13} />
+                    {c.studentName}
+                </span>
+                <span className={styles.metaItem}>
+                    <Clock size={13} />
+                    {fmtDate(c.createdAt)}
+                </span>
+            </div>
+
+            {/* Assigned staff */}
+            {c.assignedTo && (
+                <div className={styles.assignedRow}>
+                    <UserCog size={13} />
+                    <span>Assigned to</span>
+                    <span className={styles.assignedBadge}>{c.assignedTo.name}</span>
+                </div>
+            )}
+
+            {/* Description */}
+            <p className={styles.description}>{c.description}</p>
+
+            {/* Images */}
+            <ComplaintImages images={c.images} />
+
+            {/* Status / Priority controls (staff only) */}
+            {isStaff && (
+                <div className={styles.controls}>
+                    <div className={styles.controlGroup}>
+                        <span className={styles.controlLabel}>Status</span>
+                        <div className={styles.chips}>
+                            {STATUSES.map(st => (
+                                <button
+                                    key={st}
+                                    className={styles.chip}
+                                    style={{
+                                        background: c.status === st ? `${STATUS_COLORS[st]}18` : 'transparent',
+                                        border: `1px solid ${c.status === st ? STATUS_COLORS[st] : 'var(--border)'}`,
+                                        color: c.status === st ? STATUS_COLORS[st] : 'var(--muted)',
+                                    }}
+                                    onClick={() => !saving && patch({ status: st })}
+                                    disabled={saving}
+                                >
+                                    {st}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className={styles.controlGroup}>
+                        <span className={styles.controlLabel}>Priority</span>
+                        <div className={styles.chips}>
+                            {PRIORITIES.map(pr => (
+                                <button
+                                    key={pr}
+                                    className={styles.chip}
+                                    style={{
+                                        background: c.priority === pr ? `${PRIORITY_COLORS[pr]}18` : 'transparent',
+                                        border: `1px solid ${c.priority === pr ? PRIORITY_COLORS[pr] : 'var(--border)'}`,
+                                        color: c.priority === pr ? PRIORITY_COLORS[pr] : 'var(--muted)',
+                                    }}
+                                    onClick={() => !saving && patch({ priority: pr })}
+                                    disabled={saving}
+                                >
+                                    {pr}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {saving && <div className={styles.saving}>Saving changes…</div>}
+                </div>
+            )}
+
+            {/* Timestamps */}
+            <div className={styles.timestamps}>
+                <span>Created: {fmtDate(c.createdAt)}</span>
+                <span>Updated: {fmtDate(c.updatedAt)}</span>
+            </div>
+
+            {/* Comments */}
+            <Comments complaintId={c.id} />
         </div>
-      </div>
-
-      <h2 className={styles.title}>{c.title}</h2>
-
-      <div className={styles.metaRow}>
-        <span>{CATEGORY_ICONS[c.category] || '📋'} {capitalize(c.category)}</span>
-        <span>👤 {c.studentName}</span>
-        <span style={{ fontFamily: 'DM Mono, monospace', fontSize: '0.75rem', color: 'var(--muted)' }}>{fmtDate(c.createdAt)}</span>
-      </div>
-
-      <p className={styles.description}>{c.description}</p>
-
-      <ComplaintImages images={c.images} />
-
-      <div className={styles.controls}>
-        <Control label="Status">
-          <div className={styles.chips}>
-            {STATUSES.map(s => (
-              <Chip
-                key={s}
-                active={c.status === s}
-                color={STATUS_COLORS[s]}
-                onClick={() => !saving && patch({ status: s })}
-              >{s}</Chip>
-            ))}
-          </div>
-        </Control>
-
-        <Control label="Priority">
-          <div className={styles.chips}>
-            {PRIORITIES.map(p => (
-              <Chip
-                key={p}
-                active={c.priority === p}
-                color={PRIORITY_COLORS[p]}
-                onClick={() => !saving && patch({ priority: p })}
-              >{p}</Chip>
-            ))}
-          </div>
-        </Control>
-      </div>
-
-      {saving && <div className={styles.saving}>Saving…</div>}
-
-      <div className={styles.timestamps}>
-        <span>Created: {fmtDate(c.createdAt)}</span>
-        <span>Updated: {fmtDate(c.updatedAt)}</span>
-      </div>
-
-      <Comments complaintId={c.id} />
-    </div>
-  );
+    );
 }
-
-function Control({ label, children }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <span style={{ fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>{label}</span>
-      {children}
-    </div>
-  );
-}
-
-function Chip({ active, color, onClick, children }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: active ? `${color}22` : 'transparent',
-        border: `1px solid ${active ? color : 'var(--border)'}`,
-        color: active ? color : 'var(--muted)',
-        padding: '5px 14px',
-        borderRadius: '99px',
-        fontSize: '0.78rem',
-        fontWeight: 600,
-        textTransform: 'capitalize',
-        cursor: 'pointer',
-        transition: 'all .15s',
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }

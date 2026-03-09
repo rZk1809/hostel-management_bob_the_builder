@@ -1,41 +1,53 @@
 import { useState } from 'react';
+import {
+    FileText, PlusCircle, User, Users, BarChart3,
+    Wrench, LogOut, Menu, X, Sun, Moon, Home,
+    ClipboardList,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import styles from './AppLayout.module.css';
 
-// Navigation items per role
 const NAV_CONFIG = {
     student: [
-        { id: 'my-complaints', label: 'My Complaints', icon: '📋' },
-        { id: 'new-complaint', label: 'New Complaint', icon: '➕' },
-        { id: 'profile', label: 'My Profile', icon: '👤' },
+        { id: 'my-complaints', label: 'My Complaints',  icon: FileText },
+        { id: 'new-complaint', label: 'New Complaint',   icon: PlusCircle },
+        { id: 'profile',       label: 'My Profile',      icon: User },
     ],
     warden: [
-        { id: 'all-complaints', label: 'All Complaints', icon: '📋', section: 'Complaints' },
-        { id: 'assign', label: 'Assign Tasks', icon: '👷', section: 'Complaints' },
-        { id: 'analytics', label: 'Analytics', icon: '📊', section: 'Insights' },
-        { id: 'profile', label: 'My Profile', icon: '👤', section: 'Account' },
+        { id: 'all-complaints', label: 'All Complaints', icon: FileText,  section: 'Complaints' },
+        { id: 'analytics',      label: 'Analytics',      icon: BarChart3, section: 'Insights' },
+        { id: 'profile',        label: 'My Profile',     icon: User,      section: 'Account' },
     ],
     admin: [
-        { id: 'all-complaints', label: 'All Complaints', icon: '📋', section: 'Complaints' },
-        { id: 'analytics', label: 'Analytics', icon: '📊', section: 'Insights' },
-        { id: 'users', label: 'User Management', icon: '👥', section: 'Admin' },
-        { id: 'profile', label: 'My Profile', icon: '👤', section: 'Account' },
+        { id: 'all-complaints', label: 'All Complaints', icon: FileText,      section: 'Complaints' },
+        { id: 'analytics',      label: 'Analytics',      icon: BarChart3,     section: 'Insights' },
+        { id: 'users',          label: 'User Management',icon: Users,         section: 'Admin' },
+        { id: 'profile',        label: 'My Profile',     icon: User,          section: 'Account' },
     ],
     maintenance: [
-        { id: 'assigned', label: 'Assigned Tasks', icon: '🔧' },
-        { id: 'profile', label: 'My Profile', icon: '👤' },
+        { id: 'assigned', label: 'Assigned Tasks', icon: ClipboardList },
+        { id: 'profile',  label: 'My Profile',     icon: User },
     ],
+};
+
+const ROLE_STYLE = {
+    admin:       { background: 'var(--danger-dim)',    color: 'var(--danger)' },
+    warden:      { background: 'var(--accent-dim)',    color: 'var(--accent)' },
+    maintenance: { background: 'var(--open-dim)',      color: 'var(--open)' },
+    student:     { background: 'var(--resolved-dim)',  color: 'var(--resolved)' },
 };
 
 export default function AppLayout({ activePage, onNavigate, title, children }) {
     const { user, logout } = useAuth();
+    const { theme, toggle } = useTheme();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const navItems = NAV_CONFIG[user?.role] || NAV_CONFIG.student;
+    const roleStyle = ROLE_STYLE[user?.role] || ROLE_STYLE.student;
 
-    // Group by section for warden/admin
     const grouped = navItems.reduce((acc, item) => {
-        const key = item.section || '';
+        const key = item.section || '_';
         if (!acc[key]) acc[key] = [];
         acc[key].push(item);
         return acc;
@@ -45,32 +57,51 @@ export default function AppLayout({ activePage, onNavigate, title, children }) {
         ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
         : '?';
 
+    const handleNav = (id) => {
+        onNavigate(id);
+        setSidebarOpen(false);
+    };
+
     return (
         <div className={styles.root}>
-            {/* Sidebar */}
-            <nav className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
+            {sidebarOpen && (
+                <div className={styles.backdrop} onClick={() => setSidebarOpen(false)} />
+            )}
+
+            {/* ── Sidebar ───────────────────────────────────────────── */}
+            <nav className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
                 <div className={styles.brand}>
-                    <span className={styles.brandIcon}>🏠</span>
+                    <div className={styles.brandLogo}>
+                        <Home size={14} />
+                    </div>
                     <div className={styles.brandText}>
                         <span className={styles.brandTitle}>HostelDesk</span>
                         <span className={styles.brandSub}>Complaint Portal</span>
                     </div>
+                    <button className={styles.sidebarClose} onClick={() => setSidebarOpen(false)} aria-label="Close">
+                        <X size={15} />
+                    </button>
                 </div>
 
                 <div className={styles.nav}>
                     {Object.entries(grouped).map(([section, items]) => (
-                        <div key={section}>
-                            {section && <div className={styles.navSectionLabel}>{section}</div>}
-                            {items.map(item => (
-                                <button
-                                    key={item.id}
-                                    className={`${styles.navItem} ${activePage === item.id ? styles.active : ''}`}
-                                    onClick={() => { onNavigate(item.id); setSidebarOpen(false); }}
-                                >
-                                    <span className={styles.navIcon}>{item.icon}</span>
-                                    {item.label}
-                                </button>
-                            ))}
+                        <div key={section} className={styles.navGroup}>
+                            {section !== '_' && (
+                                <div className={styles.navSectionLabel}>{section}</div>
+                            )}
+                            {items.map(item => {
+                                const Icon = item.icon;
+                                return (
+                                    <button
+                                        key={item.id}
+                                        className={`${styles.navItem} ${activePage === item.id ? styles.active : ''}`}
+                                        onClick={() => handleNav(item.id)}
+                                    >
+                                        <Icon size={14} className={styles.navIcon} strokeWidth={2} />
+                                        <span>{item.label}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
                     ))}
                 </div>
@@ -79,32 +110,47 @@ export default function AppLayout({ activePage, onNavigate, title, children }) {
                     <div className={styles.userCard}>
                         <div className={styles.avatar}>{initials}</div>
                         <div className={styles.userInfo}>
-                            <div className={styles.userName}>{user?.name}</div>
-                            <div className={styles.userRole}>{user?.role}</div>
+                            <span className={styles.userName}>{user?.name}</span>
+                            <span className={styles.userRoleBadge} style={roleStyle}>
+                                {user?.role}
+                            </span>
                         </div>
                     </div>
                     <button className={styles.logoutBtn} onClick={logout}>
-                        🚪 Logout
+                        <LogOut size={13} strokeWidth={2} />
+                        Sign out
                     </button>
                 </div>
             </nav>
 
-            {/* Main content */}
+            {/* ── Main content ──────────────────────────────────────── */}
             <div className={styles.content}>
                 <header className={styles.topbar}>
-                    {/* Mobile hamburger */}
-                    <button
-                        style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: '1.2rem', cursor: 'pointer', display: 'none' }}
-                        onClick={() => setSidebarOpen(s => !s)}
-                        aria-label="Toggle sidebar"
-                    >
-                        ☰
-                    </button>
-                    <span className={styles.topbarTitle}>{title}</span>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-                        {user?.roomNumber ? `Room ${user.roomNumber}` : ''}
+                    <div className={styles.topbarLeft}>
+                        <button
+                            className={styles.hamburger}
+                            onClick={() => setSidebarOpen(s => !s)}
+                            aria-label="Toggle navigation"
+                        >
+                            <Menu size={17} strokeWidth={2} />
+                        </button>
+                        <h1 className={styles.topbarTitle}>{title}</h1>
+                    </div>
+                    <div className={styles.topbarRight}>
+                        {user?.roomNumber && (
+                            <span className={styles.roomTag}>Room {user.roomNumber}</span>
+                        )}
+                        <button
+                            className={styles.themeBtn}
+                            onClick={toggle}
+                            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                        >
+                            {theme === 'dark' ? <Sun size={15} strokeWidth={2} /> : <Moon size={15} strokeWidth={2} />}
+                        </button>
                     </div>
                 </header>
+
                 <main className={styles.page}>
                     {children}
                 </main>

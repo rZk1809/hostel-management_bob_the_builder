@@ -1,129 +1,140 @@
 import { useState } from 'react';
+import { AlertCircle, User, Paperclip } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import styles from './ComplaintForm.module.css';
 
 const CATEGORIES = ['maintenance', 'food', 'wifi', 'cleanliness', 'security', 'other'];
 const PRIORITIES = ['low', 'medium', 'high'];
-
-const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default function ComplaintForm({ onSuccess, onCancel }) {
-  const { user } = useAuth();
-  const [form, setForm] = useState({
-    category: 'maintenance',
-    title: '',
-    description: '',
-    priority: 'medium',
-  });
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [image, setImage] = useState(null);
+    const { user } = useAuth();
+    const [form, setForm] = useState({ category: 'maintenance', title: '', description: '', priority: 'medium' });
+    const [image, setImage] = useState(null);
+    const [error, setError] = useState('');
+    const [saving, setSaving] = useState(false);
 
-  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+    const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
-  const submit = async () => {
-    if (!form.title || form.title.trim().length < 3) {
-      setError('Please enter a title (at least 3 characters).');
-      return;
-    }
-    if (!form.description || form.description.trim().length < 10) {
-      setError('Please describe the issue (at least 10 characters).');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    try {
-      let imageUrl = null;
-      if (image) {
-        const res = await api.uploadImage(image);
-        imageUrl = res.url;
-      }
+    const submit = async (e) => {
+        e.preventDefault();
+        if (!form.title || form.title.trim().length < 3) {
+            setError('Title must be at least 3 characters.');
+            return;
+        }
+        if (!form.description || form.description.trim().length < 10) {
+            setError('Description must be at least 10 characters.');
+            return;
+        }
+        setSaving(true);
+        setError('');
+        try {
+            let imageUrl = null;
+            if (image) {
+                const res = await api.uploadImage(image);
+                imageUrl = res.url;
+            }
+            const payload = { ...form };
+            if (imageUrl) payload.images = [imageUrl];
+            await api.createComplaint(payload);
+            onSuccess();
+        } catch (e) {
+            setError(e.message || 'Failed to submit. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
 
-      const payload = { ...form };
-      if (imageUrl) payload.images = [imageUrl];
+    return (
+        <form className={styles.wrap} onSubmit={submit}>
+            <div>
+                <h2 className={styles.heading}>File a Complaint</h2>
+            </div>
 
-      await api.createComplaint(payload);
-      onSuccess();
-    } catch (e) {
-      setError(e.message || 'Failed to submit. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
+            {/* Who is filing */}
+            <div className={styles.filedBy}>
+                <User size={13} />
+                <span>Filing as</span>
+                <span className={styles.filedByName}>{user?.name}</span>
+                {user?.roomNumber && (
+                    <span className={styles.filedByRoom}>Room {user.roomNumber}</span>
+                )}
+            </div>
 
-  return (
-    <div className={styles.wrap}>
-      <h2 className={styles.heading}>New Complaint</h2>
+            {error && (
+                <div className={styles.error}>
+                    <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                    {error}
+                </div>
+            )}
 
-      {/* Show who is filing — read-only from auth context */}
-      <div className={styles.filedBy}>
-        Filing as <strong>{user?.name}</strong>
-        {user?.roomNumber ? ` · Room ${user.roomNumber}` : ''}
-      </div>
+            <div className={styles.row}>
+                <Field label="Category" styles={styles}>
+                    <select className={styles.input} value={form.category} onChange={set('category')}>
+                        {CATEGORIES.map(c => <option key={c} value={c}>{cap(c)}</option>)}
+                    </select>
+                </Field>
+                <Field label="Priority" styles={styles}>
+                    <select className={styles.input} value={form.priority} onChange={set('priority')}>
+                        {PRIORITIES.map(p => <option key={p} value={p}>{cap(p)}</option>)}
+                    </select>
+                </Field>
+            </div>
 
-      {error && <div className={styles.error}>{error}</div>}
+            <Field label="Title *" styles={styles}>
+                <input
+                    className={styles.input}
+                    value={form.title}
+                    onChange={set('title')}
+                    placeholder="Brief description of the issue"
+                    maxLength={200}
+                />
+            </Field>
 
-      <div className={styles.row}>
-        <Field label="Category">
-          <select className={styles.input} value={form.category} onChange={set('category')}>
-            {CATEGORIES.map(c => <option key={c} value={c}>{capitalize(c)}</option>)}
-          </select>
-        </Field>
-        <Field label="Priority">
-          <select className={styles.input} value={form.priority} onChange={set('priority')}>
-            {PRIORITIES.map(p => <option key={p} value={p}>{capitalize(p)}</option>)}
-          </select>
-        </Field>
-      </div>
+            <Field label="Description *" styles={styles}>
+                <textarea
+                    className={styles.input}
+                    rows={4}
+                    value={form.description}
+                    onChange={set('description')}
+                    placeholder="Describe the issue in detail (minimum 10 characters)…"
+                    maxLength={2000}
+                />
+            </Field>
 
-      <Field label="Title *">
-        <input
-          className={styles.input}
-          value={form.title}
-          onChange={set('title')}
-          placeholder="Brief title of the issue"
-          maxLength={200}
-        />
-      </Field>
+            <Field label="Attachment (optional)" styles={styles}>
+                <input
+                    type="file"
+                    accept="image/*"
+                    className={styles.fileInput}
+                    onChange={e => setImage(e.target.files[0] || null)}
+                />
+                {image ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: 'var(--resolved)', marginTop: 4 }}>
+                        <Paperclip size={11} />
+                        {image.name}
+                    </div>
+                ) : (
+                    <div className={styles.fileHint}>Supports JPG, PNG, WEBP</div>
+                )}
+            </Field>
 
-      <Field label="Description *">
-        <textarea
-          className={styles.input}
-          rows={4}
-          value={form.description}
-          onChange={set('description')}
-          placeholder="Describe the issue in detail (min 10 characters)…"
-          maxLength={2000}
-        />
-      </Field>
-
-      <Field label="Attachment (Optional)">
-        <input
-          type="file"
-          accept="image/*"
-          className={styles.input}
-          style={{ padding: '0.4rem', fontSize: '0.85rem' }}
-          onChange={(e) => setImage(e.target.files[0] || null)}
-        />
-        {image && <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '4px' }}>Selected: {image.name}</div>}
-      </Field>
-
-      <div className={styles.actions}>
-        <button className={styles.cancel} onClick={onCancel}>Cancel</button>
-        <button className={styles.submit} onClick={submit} disabled={saving}>
-          {saving ? 'Submitting…' : 'Submit Complaint'}
-        </button>
-      </div>
-    </div>
-  );
+            <div className={styles.actions}>
+                <button type="button" className={styles.cancel} onClick={onCancel}>Cancel</button>
+                <button type="submit" className={styles.submit} disabled={saving}>
+                    {saving ? 'Submitting…' : 'Submit Complaint'}
+                </button>
+            </div>
+        </form>
+    );
 }
 
-function Field({ label, children }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label style={{ fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
-      {children}
-    </div>
-  );
+function Field({ label, children, styles }) {
+    return (
+        <div className={styles.fieldGroup}>
+            <label className={styles.label}>{label}</label>
+            {children}
+        </div>
+    );
 }
