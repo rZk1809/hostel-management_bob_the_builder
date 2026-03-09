@@ -1,30 +1,52 @@
 import { useState } from 'react';
 import { api } from '../api';
+import { useAuth } from '../context/AuthContext';
 import styles from './ComplaintForm.module.css';
 
 const CATEGORIES = ['maintenance', 'food', 'wifi', 'cleanliness', 'security', 'other'];
+const PRIORITIES = ['low', 'medium', 'high'];
 
-const EMPTY = { studentName: '', roomNumber: '', category: 'maintenance', title: '', description: '', priority: 'medium' };
+const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default function ComplaintForm({ onSuccess, onCancel }) {
-  const [form, setForm] = useState(EMPTY);
+  const { user } = useAuth();
+  const [form, setForm] = useState({
+    category: 'maintenance',
+    title: '',
+    description: '',
+    priority: 'medium',
+  });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [image, setImage] = useState(null);
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const submit = async () => {
-    if (!form.studentName || !form.roomNumber || !form.title || !form.description) {
-      setError('Please fill in all required fields.');
+    if (!form.title || form.title.trim().length < 3) {
+      setError('Please enter a title (at least 3 characters).');
+      return;
+    }
+    if (!form.description || form.description.trim().length < 10) {
+      setError('Please describe the issue (at least 10 characters).');
       return;
     }
     setSaving(true);
     setError('');
     try {
-      await api.createComplaint(form);
+      let imageUrl = null;
+      if (image) {
+        const res = await api.uploadImage(image);
+        imageUrl = res.url;
+      }
+
+      const payload = { ...form };
+      if (imageUrl) payload.images = [imageUrl];
+
+      await api.createComplaint(payload);
       onSuccess();
     } catch (e) {
-      setError('Failed to submit. Is the server running?');
+      setError(e.message || 'Failed to submit. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -33,16 +55,14 @@ export default function ComplaintForm({ onSuccess, onCancel }) {
   return (
     <div className={styles.wrap}>
       <h2 className={styles.heading}>New Complaint</h2>
-      {error && <div className={styles.error}>{error}</div>}
 
-      <div className={styles.row}>
-        <Field label="Student Name *">
-          <input className={styles.input} value={form.studentName} onChange={set('studentName')} placeholder="e.g. Arjun Mehta" />
-        </Field>
-        <Field label="Room Number *">
-          <input className={styles.input} value={form.roomNumber} onChange={set('roomNumber')} placeholder="e.g. 204" />
-        </Field>
+      {/* Show who is filing — read-only from auth context */}
+      <div className={styles.filedBy}>
+        Filing as <strong>{user?.name}</strong>
+        {user?.roomNumber ? ` · Room ${user.roomNumber}` : ''}
       </div>
+
+      {error && <div className={styles.error}>{error}</div>}
 
       <div className={styles.row}>
         <Field label="Category">
@@ -52,17 +72,41 @@ export default function ComplaintForm({ onSuccess, onCancel }) {
         </Field>
         <Field label="Priority">
           <select className={styles.input} value={form.priority} onChange={set('priority')}>
-            {['low','medium','high'].map(p => <option key={p} value={p}>{capitalize(p)}</option>)}
+            {PRIORITIES.map(p => <option key={p} value={p}>{capitalize(p)}</option>)}
           </select>
         </Field>
       </div>
 
       <Field label="Title *">
-        <input className={styles.input} value={form.title} onChange={set('title')} placeholder="Brief title of the issue" />
+        <input
+          className={styles.input}
+          value={form.title}
+          onChange={set('title')}
+          placeholder="Brief title of the issue"
+          maxLength={200}
+        />
       </Field>
 
       <Field label="Description *">
-        <textarea className={styles.input} rows={4} value={form.description} onChange={set('description')} placeholder="Describe the issue in detail…" />
+        <textarea
+          className={styles.input}
+          rows={4}
+          value={form.description}
+          onChange={set('description')}
+          placeholder="Describe the issue in detail (min 10 characters)…"
+          maxLength={2000}
+        />
+      </Field>
+
+      <Field label="Attachment (Optional)">
+        <input
+          type="file"
+          accept="image/*"
+          className={styles.input}
+          style={{ padding: '0.4rem', fontSize: '0.85rem' }}
+          onChange={(e) => setImage(e.target.files[0] || null)}
+        />
+        {image && <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '4px' }}>Selected: {image.name}</div>}
       </Field>
 
       <div className={styles.actions}>
@@ -83,5 +127,3 @@ function Field({ label, children }) {
     </div>
   );
 }
-
-function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }

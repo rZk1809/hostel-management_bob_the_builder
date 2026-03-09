@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { api } from '../api';
 import { STATUS_COLORS, PRIORITY_COLORS, CATEGORY_ICONS, fmtDate } from '../utils';
+import ComplaintImages from './ComplaintImages';
+import Comments from './Comments';
 import styles from './ComplaintDetail.module.css';
 
-const STATUSES   = ['open', 'in-progress', 'resolved'];
+const STATUSES = ['open', 'in-progress', 'resolved'];
 const PRIORITIES = ['low', 'medium', 'high'];
 
 export default function ComplaintDetail({ complaint: init, onUpdate, onDelete }) {
-  const [c, setC]       = useState(init);
+  const [c, setC] = useState(init);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -47,6 +49,8 @@ export default function ComplaintDetail({ complaint: init, onUpdate, onDelete })
 
       <p className={styles.description}>{c.description}</p>
 
+      <ComplaintImages images={c.images} />
+
       <div className={styles.controls}>
         <Control label="Status">
           <div className={styles.chips}>
@@ -81,6 +85,8 @@ export default function ComplaintDetail({ complaint: init, onUpdate, onDelete })
         <span>Created: {fmtDate(c.createdAt)}</span>
         <span>Updated: {fmtDate(c.updatedAt)}</span>
       </div>
+
+      <Comments complaintId={c.id} />
     </div>
   );
 }

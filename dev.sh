@@ -5,7 +5,7 @@
 trap 'kill 0' INT TERM
 
 echo "🚀 Starting server on :4000 ..."
-(cd server && node index.js) &
+(cd server && node src/app.js) &
 
 echo "⚡ Starting client on :5173 ..."
 (cd client && ./node_modules/.bin/vite) &
